@@ -42,6 +42,10 @@
         }
       }
 
+      function assertEqual(expected, actual) {
+        assert(eq(expected, actual), `expected ${expected} to equal ${actual}`);
+      }
+
       function initCanvas(canvas, width, height) {
         const scale = window.devicePixelRatio;
         const ctx = canvas.getContext("2d");
@@ -60,8 +64,8 @@
       }
 
       function testCompact() {
-        assert(eq(compact([1,2,3]), [1,2,3]), '[1,2,3] is compact already');
-        assert(eq(compact([1,false,null,3]), [1,3]), 'falses and nulls get compacted');
+        assertEqual([1,2,3], compact([1,2,3]));
+        assertEqual([1,3], compact([1,false,null,3]));
       }
 
 
@@ -70,8 +74,8 @@
       }
 
       function testSum() {
-        assert(sum([]) === 0, 'empty arrays should sum to zero');
-        assert(sum([1,2,3]) === 6, 'sum([1,2,3]) !== 6')
+        assertEqual(0, sum([]));
+        assertEqual(6, sum([1,2,3]));
       }
 
 
@@ -107,6 +111,12 @@
 
         return r;
       }
+
+      function testRay() {
+        const r = ray(vec(0,0,0), vec(0,1,0));
+        assertEqual()
+      }
+
 
       const COLORS = {
         red:   color(255, 0, 0),
