@@ -10,6 +10,38 @@
       const WIDTH = 640;
       const HEIGHT = 480;
 
+      function runTests() {
+        for (let key in window) {
+          if (key.match(/^test/) && typeof window[key] === "function") {
+            window[key]();
+          }
+        }
+      }
+
+      function has(o, key) {
+        return Object.prototype.hasOwnProperty.call(o, key);
+      }
+
+      function eq(o1, o2) {
+        if (o1 === o2) { return true; }
+        if (typeof o1 !== "object" || typeof o2 !== "object") { return false; }
+        if (o1.constructor !== o2.constructor) { return false; }
+
+        for (let key in o1) {
+          if (!has(o2, key)) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      function assert(condition, message) {
+        if (!condition) {
+          throw message;
+        }
+      }
+
       function initCanvas(canvas, width, height) {
         const scale = window.devicePixelRatio;
         const ctx = canvas.getContext("2d");
@@ -27,6 +59,22 @@
         return a.filter(a => a);
       }
 
+      function testCompact() {
+        assert(eq(compact([1,2,3]), [1,2,3]), '[1,2,3] is compact already');
+        assert(eq(compact([1,false,null,3]), [1,3]), 'falses and nulls get compacted');
+      }
+
+
+      function sum(a) {
+        return a.reduce((x, y) => x + y, 0);
+      }
+
+      function testSum() {
+        assert(sum([]) === 0, 'empty arrays should sum to zero');
+        assert(sum([1,2,3]) === 6, 'sum([1,2,3]) !== 6')
+      }
+
+
       function vec(x, y, z) {
         return [x, y, z];
       }
@@ -35,12 +83,29 @@
         return [r, g, b, 255];
       }
 
+      function darken(c, b) {
+        return [c[0]*b, c[1]*b, c[2]*b, c[3]];
+      }
+
+      function testDarken() {
+        assert(eq(darken(COLORS.red, 1), COLORS.red), 'darkening by 1 should result in the same color');
+        assert(eq(darken(COLORS.white, 0.5), color(127.5, 127.5, 127.5)), 'darkening by less than one should darken');
+      }
+
+
       function ray(origin, direction) {
         if (!isNormalized(direction)) {
           throw "direction is not normalized"
         }
 
-        return {origin, direction};
+        function r(t) {
+          return add(origin, scale(t, direction));
+        }
+
+        r.origin = origin;
+        r.direction = direction;
+
+        return r;
       }
 
       const COLORS = {
@@ -48,6 +113,7 @@
         green: color(0, 255, 0),
         blue:  color(0, 0, 255),
         black: color(0, 0, 0),
+        white: color(255, 255, 255),
       };
 
       function dot(v1, v2) {
@@ -69,6 +135,16 @@
       // |v|^2
       function len2(v) {
         return v[0]**2 + v[1]**2 + v[2]**2;
+      }
+
+      function len(v) {
+        return Math.sqrt(len2(v));
+      }
+
+      function normalize(v) {
+        const l = len(v);
+
+        return v.map(x => x/l);
       }
 
       function isNormalized(v) {
@@ -139,36 +215,70 @@
         }
       }
 
+      function findClosestIntersection(objects, ray) {
+        const intersections = objects.
+          map(o => ({o, distance: o.intersect(ray)})).
+          filter(intersection => intersection.distance < Infinity);
+
+        const closest = intersections.sort(compareIntersections)[0];
+
+        return closest || null;
+      }
+
+      function writeColor(imageData, i, color) {
+        imageData.data[i]   = color[0];
+        imageData.data[i+1] = color[1];
+        imageData.data[i+2] = color[2];
+        imageData.data[i+3] = color[3];
+      }
+
       function render(scene, imageData) {
         for (let i = 0; i < imageData.data.length; i += 4) {
-          const origin = indexToScreenCoordinates(i, imageData);
-          const direction = vec(0, 1, 0);
+          const pixel = indexToScreenCoordinates(i, imageData);
+          const direction = normalize(subtract(pixel, scene.camera));
 
-          const r = ray(origin, direction);
+          const primaryRay = ray(pixel, direction);
 
           let color = COLORS.black;
 
-          const intersections = scene.objects.
-            map(o => ({o, distance: o.intersect(r)})).
-            filter(intersection => intersection.distance < Infinity);
+          const primaryIntersection = findClosestIntersection(scene.objects, primaryRay);
 
-          const closestIntersection = intersections.sort(compareIntersections)[0];
-
-          if (closestIntersection) {
-            color = closestIntersection.o.color;
+          if (!primaryIntersection) {
+            writeColor(imageData, i, color);
+            continue;
           }
 
-          imageData.data[i] =   color[0];
-          imageData.data[i+1] = color[1];
-          imageData.data[i+2] = color[2];
-          imageData.data[i+3] = color[3];
+          const brightnesses = scene.lights.map(l => {
+            const intersectionPoint = primaryRay(primaryIntersection.distance);
+            const direction = normalize(subtract(l.pos, intersectionPoint));
+
+            const shadowRay = ray(intersectionPoint, direction);
+
+            const shadowIntersection = findClosestIntersection(scene.objects, shadowRay);
+
+            if (shadowIntersection) {
+              return 0;
+            } else {
+              return l.brightness;
+            }
+          });
+
+          color = darken(primaryIntersection.o.color, sum(brightnesses));
+
+          writeColor(imageData, i, color);
         }
       }
 
+      runTests();
+
       const scene = {
-        camera: vec(0, -1, 0),
+        camera: vec(0, -200, 0),
         objects: [
-          new Sphere(vec(0, 500, 0), 200, COLORS.red),
+          new Sphere(vec(0, 800, 0), 200, COLORS.red),
+          new Sphere(vec(-200, 400, 0), 200, COLORS.blue),
+        ],
+        lights: [
+          {pos: vec(200, -200, 200), brightness: 0.5},
         ],
       };
 
