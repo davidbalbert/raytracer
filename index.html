@@ -27,8 +27,14 @@
         if (typeof o1 !== "object" || typeof o2 !== "object") { return false; }
         if (o1.constructor !== o2.constructor) { return false; }
 
-        for (let key in o1) {
-          if (!has(o2, key)) {
+        for (let key of Object.keys(o1)) {
+          if (!has(o2, key) || o1[key] !== o2[key]) {
+            return false;
+          }
+        }
+
+        for (let key of Object.keys(o2)) {
+          if (!has(o1, key)) {
             return false;
           }
         }
@@ -38,7 +44,10 @@
 
       function assert(condition, message) {
         if (!condition) {
-          throw message;
+          let e = new Error(message);
+          const lines = e.stack.split("\n");
+          e.stack = lines.filter(l => !l.match(/assert/)).join("\n");
+          throw e;
         }
       }
 
@@ -92,8 +101,8 @@
       }
 
       function testDarken() {
-        assert(eq(darken(COLORS.red, 1), COLORS.red), 'darkening by 1 should result in the same color');
-        assert(eq(darken(COLORS.white, 0.5), color(127.5, 127.5, 127.5)), 'darkening by less than one should darken');
+        assertEqual(COLORS.red, darken(COLORS.red, 1));
+        assertEqual(color(127.5, 127.5, 127.5), darken(COLORS.white, 0.5));
       }
 
 
@@ -114,7 +123,10 @@
 
       function testRay() {
         const r = ray(vec(0,0,0), vec(0,1,0));
-        assertEqual()
+        assertEqual(vec(0,1,0), r(1));
+        assertEqual(vec(0,2,0), r(2));
+        assertEqual(vec(0,0,0), r(0));
+        assertEqual(vec(0,-2,0), r(-2));
       }
 
 
@@ -130,22 +142,52 @@
         return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
       }
 
+      function testDot() {
+        assertEqual(20, dot(vec(1,2,3), vec(2,3,4)));
+        assertEqual(len(vec(0,0,3)), dot(vec(0,0,1), vec(0,0,3)));
+      }
+
+
       function scale(a, v) {
         return [a*v[0], a*v[1], a*v[2]];
       }
 
-      function subtract(v1, v2) {
-        return [v1[0]-v2[0], v1[1]-v2[1], v1[2]-v2[2]];
+      function testScale() {
+        assertEqual(vec(2,4,6), scale(2, vec(1,2,3)));
       }
+
 
       function add(v1, v2) {
         return [v1[0]+v2[0], v1[1]+v2[1], v1[2]+v2[2]];
       }
 
+      function testAdd() {
+        assertEqual(vec(1,5,3), add(vec(1,0,1), vec(0,5,2)));
+      }
+
+
+      function subtract(v1, v2) {
+        return [v1[0]-v2[0], v1[1]-v2[1], v1[2]-v2[2]];
+      }
+
+      function testSubtract() {
+        assertEqual(vec(1,1,1), subtract(vec(2,3,4), vec(1,2,3)));
+      }
+
+
       // |v|^2
       function len2(v) {
         return v[0]**2 + v[1]**2 + v[2]**2;
       }
+
+      function testLen2() {
+        assertEqual(3, len2(vec(1,1,1)));
+        assertEqual(4, len2(vec(0,0,2)));
+
+        const result = len2(vec(0, 1/Math.sqrt(2), 1/Math.sqrt(2)));
+        assert(Math.abs(result - 1) < 1e-6, 'expected length of 45° unit vector to be 1');
+      }
+
 
       function len(v) {
         return Math.sqrt(len2(v));
@@ -158,7 +200,7 @@
       }
 
       function isNormalized(v) {
-        return (len2(v) - 1) < 1e-6;
+        return Math.abs(len2(v) - 1) < 1e-6;
       }
 
       function solveQuadratic(a, b, c) {
@@ -210,8 +252,8 @@
 
         return [
           (pixelNumber%width) - width/2,
-          -1,
-          Math.floor(pixelNumber/width) - height/2
+          0,
+          -(Math.floor(pixelNumber/width) - height/2)
         ];
       }
 
@@ -288,7 +330,8 @@
           new Sphere(vec(-200, 400, 0), 200, COLORS.blue),
         ],
         lights: [
-          {pos: vec(200, -200, 200), brightness: 0.5},
+          {pos: vec(-200, -400, 400), brightness: 0.5},
+          {pos: vec(200, -400, 400), brightness: 0.5},
         ],
       };
 
