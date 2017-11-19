@@ -10,6 +10,8 @@
       const WIDTH = 640;
       const HEIGHT = 480;
 
+      const EPSILON = 1e-6;
+
       function runTests() {
         for (let key in window) {
           if (key.match(/^test/) && typeof window[key] === "function") {
@@ -185,7 +187,7 @@
         assertEqual(4, len2(vec(0,0,2)));
 
         const result = len2(vec(0, 1/Math.sqrt(2), 1/Math.sqrt(2)));
-        assert(Math.abs(result - 1) < 1e-6, 'expected length of 45° unit vector to be 1');
+        assert(Math.abs(result - 1) < EPSILON, 'expected length of 45° unit vector to be 1');
       }
 
 
@@ -270,7 +272,7 @@
       function findClosestIntersection(objects, ray) {
         const intersections = objects.
           map(o => ({o, distance: o.intersect(ray)})).
-          filter(intersection => intersection.distance < Infinity);
+          filter(intersection => intersection.distance < Infinity && intersection.distance > EPSILON);
 
         const closest = intersections.sort(compareIntersections)[0];
 
@@ -291,17 +293,16 @@
 
           const primaryRay = ray(pixel, direction);
 
-          let color = COLORS.black;
-
           const primaryIntersection = findClosestIntersection(scene.objects, primaryRay);
 
           if (!primaryIntersection) {
-            writeColor(imageData, i, color);
+            writeColor(imageData, i, COLORS.black);
             continue;
           }
 
+          const intersectionPoint = primaryRay(primaryIntersection.distance);
+
           const brightnesses = scene.lights.map(l => {
-            const intersectionPoint = primaryRay(primaryIntersection.distance);
             const direction = normalize(subtract(l.pos, intersectionPoint));
 
             const shadowRay = ray(intersectionPoint, direction);
@@ -315,7 +316,7 @@
             }
           });
 
-          color = darken(primaryIntersection.o.color, sum(brightnesses));
+          const color = darken(primaryIntersection.o.color, sum(brightnesses));
 
           writeColor(imageData, i, color);
         }
@@ -326,8 +327,8 @@
       const scene = {
         camera: vec(0, -200, 0),
         objects: [
-          new Sphere(vec(0, 800, 0), 200, COLORS.red),
-          new Sphere(vec(-200, 400, 0), 200, COLORS.blue),
+          new Sphere(vec(0, 700, 0), 200, COLORS.red),
+          new Sphere(vec(-200, 300, 0), 200, COLORS.blue),
         ],
         lights: [
           {pos: vec(-200, -400, 400), brightness: 0.5},
