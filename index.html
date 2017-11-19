@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Ray tracer</title>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <script>
+      const WIDTH = 640;
+      const HEIGHT = 480;
+
+      function initCanvas(canvas, width, height) {
+        const scale = window.devicePixelRatio;
+        const ctx = canvas.getContext("2d");
+
+        canvas.style.width = WIDTH + 'px';
+        canvas.style.height = HEIGHT + 'px';
+
+        canvas.width = WIDTH * scale;
+        canvas.height = HEIGHT * scale;
+
+        ctx.scale(scale, scale);
+      }
+
+      function compact(a) {
+        return a.filter(a => a);
+      }
+
+      function vec(x, y, z) {
+        return [x, y, z];
+      }
+
+      function color(r, g, b) {
+        return [r, g, b, 255];
+      }
+
+      function ray(origin, direction) {
+        if (!isNormalized(direction)) {
+          throw "direction is not normalized"
+        }
+
+        return {origin, direction};
+      }
+
+      const COLORS = {
+        red:   color(255, 0, 0),
+        green: color(0, 255, 0),
+        blue:  color(0, 0, 255),
+        black: color(0, 0, 0),
+      };
+
+      function dot(v1, v2) {
+        return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+      }
+
+      function scale(a, v) {
+        return [a*v[0], a*v[1], a*v[2]];
+      }
+
+      function subtract(v1, v2) {
+        return [v1[0]-v2[0], v1[1]-v2[1], v1[2]-v2[2]];
+      }
+
+      function add(v1, v2) {
+        return [v1[0]+v2[0], v1[1]+v2[1], v1[2]+v2[2]];
+      }
+
+      // |v|^2
+      function len2(v) {
+        return v[0]**2 + v[1]**2 + v[2]**2;
+      }
+
+      function isNormalized(v) {
+        return (len2(v) - 1) < 1e-6;
+      }
+
+      function solveQuadratic(a, b, c) {
+        const discriminant = b**2 - 4*a*c;
+
+        if (discriminant === 0) {
+          return [-b/(2*a), null];
+        } else if (discriminant > 0) {
+          const sqrt = Math.sqrt(discriminant);
+          const t0 = (-b-sqrt)/(2*a);
+          const t1 = (-b+sqrt)/(2*a);
+
+          return [t0, t1].sort();
+        } else {
+          return [null, null];
+        }
+      }
+
+      class Sphere {
+        constructor(center, radius, color) {
+          this.center = center;
+          this.r = radius;
+          this.color = color;
+        }
+
+        intersect(ray) {
+          const { center, r } = this;
+          const o = ray.origin;
+          const d = ray.direction;
+
+          const L = subtract(o, center);
+
+          // at^2 + bt + c = 0
+          const a = 1;
+          const b = dot(scale(2, ray.direction), L);
+          const c = len2(L) - r**2;
+
+          const roots = solveQuadratic(a, b, c);
+
+          const intersection = compact(roots).filter(t => t >= 0)[0];
+
+          return intersection || Infinity;
+        }
+      }
+
+      function indexToScreenCoordinates(i, imageData) {
+        const pixelNumber = (i - i%4)/4;
+        const { width, height } = imageData;
+
+        return [
+          (pixelNumber%width) - width/2,
+          -1,
+          Math.floor(pixelNumber/width) - height/2
+        ];
+      }
+
+      function compareIntersections(i1, i2) {
+        if (i1.distance < i2.distance) {
+          return -1;
+        } else if (i1.distance > i2.distance) {
+          return 1;
+        } else {
+          return 0;
+        }
+      }
+
+      function render(scene, imageData) {
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          const origin = indexToScreenCoordinates(i, imageData);
+          const direction = vec(0, 1, 0);
+
+          const r = ray(origin, direction);
+
+          let color = COLORS.black;
+
+          const intersections = scene.objects.
+            map(o => ({o, distance: o.intersect(r)})).
+            filter(intersection => intersection.distance < Infinity);
+
+          const closestIntersection = intersections.sort(compareIntersections)[0];
+
+          if (closestIntersection) {
+            color = closestIntersection.o.color;
+          }
+
+          imageData.data[i] =   color[0];
+          imageData.data[i+1] = color[1];
+          imageData.data[i+2] = color[2];
+          imageData.data[i+3] = color[3];
+        }
+      }
+
+      const scene = {
+        camera: vec(0, -1, 0),
+        objects: [
+          new Sphere(vec(0, 500, 0), 200, COLORS.red),
+        ],
+      };
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      initCanvas(canvas, WIDTH, HEIGHT);
+
+      const imageData = ctx.createImageData(canvas.width, canvas.height);
+
+      render(scene, imageData);
+
+      ctx.putImageData(imageData, 0, 0);
+    </script>
+  </body>
+</html>
