@@ -273,7 +273,7 @@
         const closest = objects.reduce((intersection, o) => {
           const distance = o.intersect(ray);
 
-          if (distance < intersection.distance && distance > EPSILON) {
+          if (distance < intersection.distance) {
             return {o, distance};
           } else {
             return intersection;
@@ -311,7 +311,7 @@
 
             const shadowRay = ray(intersectionPoint, direction);
 
-            const shadowIntersection = findClosestIntersection(scene.objects, shadowRay);
+            const shadowIntersection = findClosestIntersection(scene.objects.filter(o => o !== primaryIntersection.o), shadowRay);
 
             if (shadowIntersection) {
               return 0;
