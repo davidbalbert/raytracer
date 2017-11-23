@@ -270,13 +270,17 @@
       }
 
       function findClosestIntersection(objects, ray) {
-        const intersections = objects.
-          map(o => ({o, distance: o.intersect(ray)})).
-          filter(intersection => intersection.distance < Infinity && intersection.distance > EPSILON);
+        const closest = objects.reduce((intersection, o) => {
+          const distance = o.intersect(ray);
 
-        const closest = intersections.sort(compareIntersections)[0];
+          if (distance < intersection.distance && distance > EPSILON) {
+            return {o, distance};
+          } else {
+            return intersection;
+          }
+        }, {o: null, distance: Infinity});
 
-        return closest || null;
+        return closest.o && closest || null;
       }
 
       function writeColor(imageData, i, color) {
