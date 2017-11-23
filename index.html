@@ -206,7 +206,7 @@
       function normalize(v) {
         const l = len(v);
 
-        return v.map(x => x/l);
+        return [v[0]/l, v[1]/l, v[2]/l];
       }
 
       function isNormalized(v) {
