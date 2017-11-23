@@ -210,7 +210,7 @@
       }
 
       function isNormalized(v) {
-        return Math.abs(len2(v) - 1) < 1e-6;
+        return Math.abs(len2(v) - 1) < EPSILON;
       }
 
       function solveQuadratic(a, b, c) {
