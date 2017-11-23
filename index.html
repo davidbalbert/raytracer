@@ -262,19 +262,9 @@
 
         return [
           (pixelNumber%width) - width/2,
-          0,
-          -(Math.floor(pixelNumber/width) - height/2)
+          -(Math.floor(pixelNumber/width) - height/2),
+          0
         ];
-      }
-
-      function compareIntersections(i1, i2) {
-        if (i1.distance < i2.distance) {
-          return -1;
-        } else if (i1.distance > i2.distance) {
-          return 1;
-        } else {
-          return 0;
-        }
       }
 
       function findClosestIntersection(objects, ray) {
@@ -337,15 +327,15 @@
       runTests();
 
       const scene = {
-        camera: vec(0, -5000, 0),
+        camera: vec(0, 0, -1500),
         objects: [
-          new Sphere(vec(0, 700, 0), 200, COLORS.red),
-          new Sphere(vec(-200, 300, 0), 200, COLORS.blue),
-          new Sphere(vec(300, 400, 300), 200, COLORS.green),
+          new Sphere(vec(0, 0, 700), 200, COLORS.red),
+          new Sphere(vec(-200, 0, 300), 200, COLORS.blue),
+          new Sphere(vec(300, 300, 400), 250, COLORS.green),
         ],
         lights: [
-          {pos: vec(-200, -400, 400), brightness: 0.5},
-          {pos: vec(200, -400, 400), brightness: 0.5},
+          {pos: vec(-200, 400, -400), brightness: 0.5},
+          {pos: vec(200, 400, -400), brightness: 0.5},
         ],
       };
 
