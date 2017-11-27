@@ -398,6 +398,32 @@
         imageData.data[i+3] = color[3];
       }
 
+      function trace(scene, primaryRay, depth) {
+        const primaryIntersection = findClosestIntersection(scene.objects, primaryRay);
+
+        if (!primaryIntersection) {
+          return COLORS.black;
+        }
+
+        const intersectionPoint = primaryRay(primaryIntersection.distance);
+
+        const brightnesses = scene.lights.map(l => {
+          const direction = normalize(subtract(l.pos, intersectionPoint));
+
+          const shadowRay = ray(intersectionPoint, direction);
+
+          const shadowIntersection = findClosestIntersection(without(scene.objects, primaryIntersection.object), shadowRay);
+
+          if (shadowIntersection) {
+            return 0;
+          } else {
+            return l.brightness;
+          }
+        });
+
+        return darken(primaryIntersection.object.color, sum(brightnesses));
+      }
+
       function render(scene, imageData) {
         const { camera } = scene;
         const angelScale = Math.tan(camera.angle/2);
@@ -412,30 +438,7 @@
 
           const primaryRay = ray(origin, direction);
 
-          const primaryIntersection = findClosestIntersection(scene.objects, primaryRay);
-
-          if (!primaryIntersection) {
-            writeColor(imageData, i, COLORS.black);
-            continue;
-          }
-
-          const intersectionPoint = primaryRay(primaryIntersection.distance);
-
-          const brightnesses = scene.lights.map(l => {
-            const direction = normalize(subtract(l.pos, intersectionPoint));
-
-            const shadowRay = ray(intersectionPoint, direction);
-
-            const shadowIntersection = findClosestIntersection(without(scene.objects, primaryIntersection.object), shadowRay);
-
-            if (shadowIntersection) {
-              return 0;
-            } else {
-              return l.brightness;
-            }
-          });
-
-          const color = darken(primaryIntersection.object.color, sum(brightnesses));
+          const color = trace(scene, primaryRay, 0);
 
           writeColor(imageData, i, color);
         }
