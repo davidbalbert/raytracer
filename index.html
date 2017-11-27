@@ -6,6 +6,7 @@
   </head>
   <body>
     <canvas id="canvas"></canvas>
+
     <script>
       const WIDTH = 640;
       const HEIGHT = 480;
@@ -30,7 +31,7 @@
         if (o1.constructor !== o2.constructor) { return false; }
 
         for (let key of Object.keys(o1)) {
-          if (!has(o2, key) || o1[key] !== o2[key]) {
+          if (!has(o2, key) || !eq(o1[key], o2[key])) {
             return false;
           }
         }
@@ -148,13 +149,28 @@
         white: color(255, 255, 255),
       };
 
-      function dot(v1, v2) {
-        return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+      function dot(a, b) {
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
       }
 
       function testDot() {
         assertEqual(20, dot(vec(1,2,3), vec(2,3,4)));
         assertEqual(len(vec(0,0,3)), dot(vec(0,0,1), vec(0,0,3)));
+      }
+
+
+      function cross(a, b) {
+        return vec(
+          a[1]*b[2] - a[2]*b[1],
+          a[2]*b[0] - a[0]*b[2],
+          a[0]*b[1] - a[1]*b[0]
+        );
+      }
+
+      function testCross() {
+        assertEqual(vec(0,0,1), cross(vec(1,0,0), vec(0,1,0)));
+        assertEqual(vec(0,0,-1), cross(vec(0,1,0), vec(1,0,0)));
+        assertEqual(vec(1,0,0), cross(vec(0,1,0), vec(0,0,1)));
       }
 
 
@@ -213,6 +229,40 @@
         return Math.abs(len2(v) - 1) < EPSILON;
       }
 
+
+      function mat(rows, cols) {
+        let m = new Array(rows);
+
+        for (let i = 0; i < m.length; i++) {
+          m[i] = new Array(cols).fill(0);
+        }
+
+        return m;
+      }
+
+      function testmat() {
+        let m = mat(4, 6);
+
+        assertEqual(4, m.length);
+
+        for (let i in m) {
+          assertEqual(6, m[i].length);
+
+          for (let j in m[i]) {
+            assertEqual(0, m[i][j]);
+          }
+        }
+      }
+
+
+      function transform(v, m) {
+        const x = v[0]*m[0][0] + v[1]*m[1][0] + v[2]*m[2][0] + m[3][0];
+        const y = v[0]*m[0][1] + v[1]*m[1][1] + v[2]*m[2][1] + m[3][1];
+        const z = v[0]*m[0][2] + v[1]*m[1][2] + v[2]*m[2][2] + m[3][2];
+
+        return [x, y, z];
+      }
+
       function solveQuadratic(a, b, c) {
         const discriminant = b**2 - 4*a*c;
 
@@ -256,16 +306,76 @@
         }
       }
 
-      function indexToScreenCoordinates(i, imageData) {
+      function degToRad(deg) {
+        return deg * Math.PI/180;
+      }
+
+      function testDegToRad() {
+        assertEqual(2*Math.PI, degToRad(360));
+        assertEqual(Math.PI, degToRad(180));
+        assertEqual(Math.PI/2, degToRad(90));
+      }
+
+
+      function indexToPixel(i, imageData) {
         const pixelNumber = (i - i%4)/4;
         const { width, height } = imageData;
 
-        return [
-          (pixelNumber%width) - width/2,
-          -(Math.floor(pixelNumber/width) - height/2),
-          0
-        ];
+        return [pixelNumber%width, Math.floor(pixelNumber/width)];
       }
+
+      function testIndexToPixel() {
+        const fakeImageData = {width: 10, height: 6};
+
+        assertEqual([0,0], indexToPixel(0, fakeImageData));
+        assertEqual([0,0], indexToPixel(3, fakeImageData));
+        assertEqual([1,0], indexToPixel(4, fakeImageData));
+        assertEqual([9,0], indexToPixel(36, fakeImageData));
+        assertEqual([0,1], indexToPixel(40, fakeImageData));
+      }
+
+
+      function pixelToVector(p, scale, cameraToWorld, imageData) {
+        const { width, height } = imageData;
+        const aspectRatio = width/height;
+
+        // normalize between 0 and 1
+        const ndc = [(p[0]+0.5)/width, (p[1]+0.5)/height];
+
+        // adjusted for the size of the screen and camera angel (centered
+        // around the origin)
+        const screen = [(2*ndc[0]-1) * aspectRatio * scale, (1 - 2*ndc[1]) * scale];
+
+        return transform(vec(screen[0], screen[1], -1), cameraToWorld);
+      }
+
+      function lookAt(from, to) {
+        const forward = normalize(subtract(from, to));
+        const right = cross(vec(0,1,0), forward);
+        const up = cross(forward, right);
+
+        const c2w = mat(4, 4);
+
+        c2w[0][0] = right[0];
+        c2w[0][1] = right[1];
+        c2w[0][2] = right[2];
+
+        c2w[1][0] = up[0];
+        c2w[1][1] = up[1];
+        c2w[1][2] = up[2];
+
+        c2w[2][0] = forward[0];
+        c2w[2][1] = forward[1];
+        c2w[2][2] = forward[2];
+
+        c2w[3][0] = from[0];
+        c2w[3][1] = from[1];
+        c2w[3][2] = from[2];
+        c2w[3][3] = 1;
+
+        return c2w;
+      }
+
 
       function findClosestIntersection(objects, ray) {
         const closest = objects.reduce((intersection, obj) => {
@@ -289,11 +399,18 @@
       }
 
       function render(scene, imageData) {
-        for (let i = 0; i < imageData.data.length; i += 4) {
-          const pixel = indexToScreenCoordinates(i, imageData);
-          const direction = normalize(subtract(pixel, scene.camera));
+        const { camera } = scene;
+        const angelScale = Math.tan(camera.angle/2);
 
-          const primaryRay = ray(pixel, direction);
+        const cameraToWorld = lookAt(camera.pos, camera.lookingAt);
+        const origin = transform(vec(0,0,0), cameraToWorld);
+
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          const pixel = indexToPixel(i, imageData);
+          const pixelVector = pixelToVector(pixel, angelScale, cameraToWorld, imageData);
+          const direction = normalize(subtract(pixelVector, origin));
+
+          const primaryRay = ray(origin, direction);
 
           const primaryIntersection = findClosestIntersection(scene.objects, primaryRay);
 
@@ -327,15 +444,19 @@
       runTests();
 
       const scene = {
-        camera: vec(0, 0, 1500),
+        camera: {
+          pos: vec(0, 0, 0),
+          lookingAt: vec(0, 0, -18),
+          angle: degToRad(45),
+        },
         objects: [
-          new Sphere(vec(0, 0, -700), 200, COLORS.red),
-          new Sphere(vec(-200, 0, -300), 200, COLORS.blue),
-          new Sphere(vec(300, 300, -400), 250, COLORS.green),
+          new Sphere(vec(0, 0, -18), 2, COLORS.red),
+          new Sphere(vec(-2, 0, -14), 2, COLORS.blue),
+          new Sphere(vec(3, 3, -15), 2.5, COLORS.green),
         ],
         lights: [
-          {pos: vec(-200, 400, 400), brightness: 0.5},
-          {pos: vec(200, 400, 400), brightness: 0.5},
+          {pos: vec(-2, 4, 4), brightness: 0.5},
+          {pos: vec(2, 4, 4), brightness: 0.5},
         ],
       };
 
@@ -347,8 +468,10 @@
       const imageData = ctx.createImageData(canvas.width, canvas.height);
 
       const start = new Date();
+
       render(scene, imageData);
       ctx.putImageData(imageData, 0, 0);
+
       console.log(new Date() - start);
     </script>
   </body>
